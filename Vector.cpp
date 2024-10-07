@@ -1,7 +1,14 @@
-using Rank = unsigned int; //秩
+typedef int Rank;
+#include<stdlib.h>
+#include<utility>
+
+
 #define DEFAULT_CAPACITY  3 //默认的初始容量（实际应用中可设置为更大）
 
 template <typename T> class Vector { //向量模板类
+
+    friend int main();
+
 protected:
     Rank _size; Rank _capacity;  T* _elem; //规模、容量、数据区
     void copyFrom(T const* A, Rank lo, Rank hi); //复制数组区间A[lo, hi)
@@ -56,16 +63,17 @@ public:
     void sort() { sort(0, _size); } //整体排序
     void unsort(Rank lo, Rank hi); //对[lo, hi)置乱
     void unsort() { unsort(0, _size); } //整体置乱
+    Vector<T> findByModulusRange(double m1, double m2) const;
     Rank dedup(); //无序去重
     Rank uniquify(); //有序去重
     // 遍历
     void traverse(void (*) (T&)); //遍历（使用函数指针，只读或局部性修改）
     template <typename VST> void traverse(VST&); //遍历（使用函数对象，可全局性修改）
-}; //Vector
+ }; //Vector
 
 //基于复制的构造方法
 template <typename T> void Vector<T>::copyFrom(T const* A, Rank lo, Rank hi) {
-    _elem = newT[_capacity = 2 * (hi - lo)];_size = 0;
+    _elem = new T[_capacity = 2 * (hi - lo)];_size = 0;
     while (lo < hi)
     {
         _elem[_size++] = A[lo++];
@@ -74,7 +82,7 @@ template <typename T> void Vector<T>::copyFrom(T const* A, Rank lo, Rank hi) {
 
 //重载向量赋值操作符
 template <typename T> Vector<T>& Vector<T>::operator=(Vector<T> const& V) {
-    if (_elem) delete [] _elem;
+    if (_elem) delete[] _elem;
     copyFrom(V._elem, 0, V.size());
     return *this;
 }
@@ -113,7 +121,7 @@ template <typename T> void permute(Vector<T>& V) {
 template <typename T> void Vector<T>::unsort(Rank lo, Rank hi) {
     T* V = _elem + lo;
     for (Rank i = hi - lo; i > 0; i--)
-        swap(V[i - 1], V[rand() % i]);
+        std::swap(V[i - 1], V[rand() % i]);
 }
 
 //无序向量元素查找
@@ -151,14 +159,14 @@ template <typename T> Rank Vector<T>::dedup() {
     int oldSize = _size;
     Rank i = 1;
     while (i < _size)
-     (find(_elem[i], 0, i) < 0) ?
-     i++ : remove(i);
+        (find(_elem[i], 0, i) < 0) ?
+        i++ : remove(i);
     return oldSize - _size;
 }
 
 //遍历
 template <typename T> void Vector<T>::traverse(void (*visit)(T&)) {
-   for (int i = 0; i < _size; i++) visit(_elem[i]);
+    for (int i = 0; i < _size; i++) visit(_elem[i]);
 }
 
 template <typename T> template <typename VST> void Vector<T>::traverse(VST& visit) {
@@ -182,4 +190,91 @@ template <typename T> Rank Vector<T>::uniquify() {
             _elem[++i] = _elem[j];
     _size = ++i; shrink();
     return j - i;
+}
+
+// 二分查找
+template <typename T> static Rank binsearch(T* A, T const& e, Rank lo, Rank hi) {
+    while (lo < hi) {
+        Rank mi = (lo + hi) >> 1; 
+        (e < A[mi]) ? hi = mi : lo = mi + 1; 
+    }
+    return --lo;
+}
+
+
+//冒泡排序
+template <typename T>
+void Vector<T>::sort(Rank lo, Rank hi) {
+    for (int i = lo; i < hi - 1; i++) {
+        for (int j = lo; j < hi - i - 1; j++) {
+            if (_elem[j].modulus() > _elem[j + 1].modulus()) {
+                std::swap(_elem[j], _elem[j + 1]);
+            }
+        }
+    }
+}
+
+//起泡排序
+template <typename T> void Vector<T>::bubbleSort(Rank lo, Rank hi) {
+    for (Rank i = lo; i < hi - 1; i++) {
+        for (Rank j = lo; j < hi - i - 1; j++) {
+            if (_elem[j].modulus() > _elem[j + 1].modulus() ||
+                (_elem[j].modulus() == _elem[j + 1].modulus() && _elem[j].real > _elem[j + 1].real)) {
+                std::swap(_elem[j], _elem[j + 1]);
+            }
+        }
+    }
+}
+
+//归并排序
+template <typename T> void Vector<T>::mergeSort(Rank lo, Rank hi) {
+    if (hi - lo <= 1) return; // 当只有一个元素时，无需排序
+    Rank mid = (lo + hi) / 2;
+    mergeSort(lo, mid);
+    mergeSort(mid, hi);
+    merge(lo, mid, hi);
+}
+
+template <typename T>
+void Vector<T>::merge(Rank lo, Rank mi, Rank hi) {
+    int n1 = mi - lo;
+    int n2 = hi - mi;
+
+    T* L = new T[n1];
+    T* R = new T[n2];
+
+    for (int i = 0; i < n1; i++)
+        L[i] = _elem[lo + i];
+    for (int j = 0; j < n2; j++)
+        R[j] = _elem[mi + j];
+
+    int i = 0, j = 0, k = lo;
+    while (i < n1 && j < n2) {
+        if (L[i] <= R[j]) {
+            _elem[k++] = L[i++];
+        }
+        else {
+            _elem[k++] = R[j++];
+        }
+    }
+    while (i < n1) {
+        _elem[k++] = L[i++];
+    }
+    while (j < n2) {
+        _elem[k++] = R[j++];
+    }
+
+    delete[] L;
+    delete[] R;
+}
+
+template <typename T> Vector<T> Vector<T>::findByModulusRange(double m1, double m2) const {
+    Vector<T> result; // 创建一个新的向量来存储结果
+    for (Rank i = 0; i < _size; i++) {
+        double mod = _elem[i].modulus(); // 计算模
+        if (mod >= m1 && mod < m2) {
+            result.insert(result.size(), _elem[i]); // 插入结果向量
+        }
+    }
+    return result; // 返回结果向量
 }
